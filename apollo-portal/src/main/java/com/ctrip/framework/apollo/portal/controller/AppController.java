@@ -52,6 +52,10 @@ public class AppController {
   private final UserInfoHolder userInfoHolder;
   private final AppService appService;
   private final PortalSettings portalSettings;
+
+  /**
+   * Spring 事件发布者
+   */
   private final ApplicationEventPublisher publisher;
   private final RolePermissionService rolePermissionService;
   private final RoleInitializationService roleInitializationService;
@@ -109,12 +113,17 @@ public class AppController {
   @PostMapping
   public App create(@Valid @RequestBody AppModel appModel) {
 
+    // 将 AppModel 转换成 App 对象
     App app = transformToApp(appModel);
 
+    // 保存 App 对象到数据库
     App createdApp = appService.createAppInLocal(app);
 
+    // 发布 AppCreationEvent 创建事件
+    // 使用处 见 com.ctrip.framework.apollo.portal.listener.CreationListener中的 onAppCreationEvent方法
     publisher.publishEvent(new AppCreationEvent(createdApp));
 
+    // 授予 App 管理员的角色
     Set<String> admins = appModel.getAdmins();
     if (!CollectionUtils.isEmpty(admins)) {
       rolePermissionService
@@ -156,8 +165,17 @@ public class AppController {
     return response;
   }
 
+  /**
+   *
+   * 补全缺失的环境
+   *
+   * @param env
+   * @param app
+   * @return
+   */
   @PostMapping(value = "/envs/{env}", consumes = {"application/json"})
   public ResponseEntity<Void> create(@PathVariable String env, @Valid @RequestBody App app) {
+    // 创建远程的 app
     appService.createAppInRemote(Env.valueOf(env), app);
 
     roleInitializationService.initNamespaceSpecificEnvRoles(app.getAppId(), ConfigConsts.NAMESPACE_APPLICATION, env, userInfoHolder.getUser().getUserId());

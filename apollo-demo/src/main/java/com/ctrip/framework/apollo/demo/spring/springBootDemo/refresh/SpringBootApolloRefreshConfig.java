@@ -28,7 +28,7 @@ public class SpringBootApolloRefreshConfig {
     this.refreshScope = refreshScope;
   }
 
-  @ApolloConfigChangeListener(value = {ConfigConsts.NAMESPACE_APPLICATION, "TEST1.apollo", "application.yaml"},
+  @ApolloConfigChangeListener(value = {ConfigConsts.NAMESPACE_APPLICATION, "TEST1.test-public", "application.yaml"},
       interestedKeyPrefixes = {"redis.cache."})
   public void onChange(ConfigChangeEvent changeEvent) {
     logger.info("before refresh {}", sampleRedisConfig.toString());

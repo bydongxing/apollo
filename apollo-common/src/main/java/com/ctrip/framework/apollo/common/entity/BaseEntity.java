@@ -3,18 +3,8 @@ package com.ctrip.framework.apollo.common.entity;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
 
+import javax.persistence.*;
 import java.util.Date;
-
-import javax.persistence.Column;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.Inheritance;
-import javax.persistence.InheritanceType;
-import javax.persistence.MappedSuperclass;
-import javax.persistence.PrePersist;
-import javax.persistence.PreRemove;
-import javax.persistence.PreUpdate;
 
 @MappedSuperclass
 @Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
@@ -88,6 +78,9 @@ public abstract class BaseEntity {
     this.id = id;
   }
 
+  /**
+   * 保存前置方法
+   */
   @PrePersist
   protected void prePersist() {
     if (this.dataChangeCreatedTime == null) {
@@ -98,11 +91,17 @@ public abstract class BaseEntity {
     }
   }
 
+  /**
+   * 更新前置方法
+   */
   @PreUpdate
   protected void preUpdate() {
     this.dataChangeLastModifiedTime = new Date();
   }
 
+  /**
+   * 删除前置方法
+   */
   @PreRemove
   protected void preRemove() {
     this.dataChangeLastModifiedTime = new Date();

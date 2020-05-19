@@ -94,6 +94,7 @@ public class RetryableRestTemplate {
     Transaction ct = Tracer.newTransaction("AdminAPI", uri);
     ct.addData("Env", env);
 
+    // 获取服务的地址信息
     List<ServiceDTO> services = getAdminServices(env, ct);
 
     for (ServiceDTO serviceDTO : services) {
