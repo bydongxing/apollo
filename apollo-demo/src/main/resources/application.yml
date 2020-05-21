@@ -11,6 +11,12 @@ app:
   id: user-test-demo  # 使用的 Apollo 的项目（应用）编号
 apollo:
   meta: http://127.0.0.1:8080 # Apollo Meta Server 地址
+  cluster: aaaa    # Apollo Cluster 名称,没找到会默认加载 default的配置
+  accesskey:
+    secret: 1cf998c4e2ad4704b45a98a509d15719 #只有经过身份验证的客户端才能访问敏感配置。如果应用开启了访问秘钥，客户端需要配置秘钥，否则无法获取配置
+  property:
+    order:
+      enable: true #默认情况下，apollo client内存中的配置存放在Properties中（底下是Hashtable），不会刻意保持和页面上看到的顺序一致，对绝大部分的场景是没有影响的。不过有些场景会强依赖配置项的顺序（如spring cloud zuul的路由规则），针对这种情况，可以开启OrderedProperties特性来使得内存中的配置顺序和页面上看到的一致。
   bootstrap:
     enabled: true # 是否开启 Apollo 配置预加载功能。默认为 false。
     eagerLoad:

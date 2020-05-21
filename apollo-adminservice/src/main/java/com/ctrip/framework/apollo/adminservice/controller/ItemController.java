@@ -12,19 +12,13 @@ import com.ctrip.framework.apollo.common.dto.ItemDTO;
 import com.ctrip.framework.apollo.common.exception.BadRequestException;
 import com.ctrip.framework.apollo.common.exception.NotFoundException;
 import com.ctrip.framework.apollo.common.utils.BeanUtils;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class ItemController {
@@ -44,15 +38,22 @@ public class ItemController {
   public ItemDTO create(@PathVariable("appId") String appId,
                         @PathVariable("clusterName") String clusterName,
                         @PathVariable("namespaceName") String namespaceName, @RequestBody ItemDTO dto) {
+
+    // 将 ItemDTO 转换成 Item 对象
     Item entity = BeanUtils.transform(Item.class, dto);
 
+    // 创建 ConfigChangeContentBuilder 对象
     ConfigChangeContentBuilder builder = new ConfigChangeContentBuilder();
+
+    // 校验对应的 Item 是否已经存在。若是，抛出 BadRequestException 异常。
     Item managedEntity = itemService.findOne(appId, clusterName, namespaceName, entity.getKey());
     if (managedEntity != null) {
       throw new BadRequestException("item already exists");
     }
     entity = itemService.save(entity);
     builder.createItem(entity);
+
+    // 将 Item 转换成 ItemDTO 对象
     dto = BeanUtils.transform(ItemDTO.class, entity);
 
     Commit commit = new Commit();

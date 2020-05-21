@@ -4,18 +4,30 @@ import com.ctrip.framework.apollo.biz.entity.Item;
 import com.ctrip.framework.apollo.core.utils.StringUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.springframework.beans.BeanUtils;
+
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-import org.springframework.beans.BeanUtils;
 
 
 public class ConfigChangeContentBuilder {
 
   private static final Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd HH:mm:ss").create();
 
+  /**
+   * 创建 Item 集合
+   */
   private List<Item> createItems = new LinkedList<>();
+
+  /**
+   * 更新 Item 集合
+   */
   private List<ItemPair> updateItems = new LinkedList<>();
+
+  /**
+   * 删除 Item 集合
+   */
   private List<Item> deleteItems = new LinkedList<>();
 
 
@@ -45,6 +57,8 @@ public class ConfigChangeContentBuilder {
     return !createItems.isEmpty() || !updateItems.isEmpty() || !deleteItems.isEmpty();
   }
 
+
+//  构建 Item 变化的 JSON 字符串
   public String build() {
     //因为事务第一段提交并没有更新时间,所以build时统一更新
     Date now = new Date();
@@ -60,6 +74,7 @@ public class ConfigChangeContentBuilder {
     for (Item item : deleteItems) {
       item.setDataChangeLastModifiedTime(now);
     }
+    // JSON 格式化成字符串
     return gson.toJson(this);
   }
 

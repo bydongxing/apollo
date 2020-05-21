@@ -73,12 +73,21 @@ public class AppNamespaceService {
     return appNamespaceRepository.findByAppId(appId);
   }
 
+  /**
+   *
+   * 创建并保存 App 下默认的 "application" 的 AppNamespace 到数据库
+   *
+   * @param appId
+   */
   @Transactional
   public void createDefaultAppNamespace(String appId) {
+
+    // 校验 `name` 在 App 下唯一
     if (!isAppNamespaceNameUnique(appId, ConfigConsts.NAMESPACE_APPLICATION)) {
       throw new BadRequestException(String.format("App already has application namespace. AppId = %s", appId));
     }
 
+    // 创建 AppNamespace 对象
     AppNamespace appNs = new AppNamespace();
     appNs.setAppId(appId);
     appNs.setName(ConfigConsts.NAMESPACE_APPLICATION);
@@ -105,12 +114,16 @@ public class AppNamespaceService {
   public AppNamespace createAppNamespaceInLocal(AppNamespace appNamespace, boolean appendNamespacePrefix) {
     String appId = appNamespace.getAppId();
 
+    // 校验对应的 App 是否存在。若不存在，抛出 BadRequestException 异常
+
     //add app org id as prefix
     App app = appService.load(appId);
     if (app == null) {
       throw new BadRequestException("App not exist. AppId = " + appId);
     }
 
+
+    // 拼接 AppNamespace 的 `name` 属性。
     StringBuilder appNamespaceName = new StringBuilder();
     //add prefix postfix
     appNamespaceName
@@ -119,16 +132,21 @@ public class AppNamespaceService {
         .append(appNamespace.formatAsEnum() == ConfigFileFormat.Properties ? "" : "." + appNamespace.getFormat());
     appNamespace.setName(appNamespaceName.toString());
 
+    // 设置 AppNamespace 的 `comment` 属性为空串，若为 null
     if (appNamespace.getComment() == null) {
       appNamespace.setComment("");
     }
 
+
+    // 校验 AppNamespace 的 `format` 是否合法
     if (!ConfigFileFormat.isValidFormat(appNamespace.getFormat())) {
      throw new BadRequestException("Invalid namespace format. format must be properties、json、yaml、yml、xml");
     }
 
+    // 设置 AppNamespace 的创建和修改人
     String operator = appNamespace.getDataChangeCreatedBy();
     if (StringUtils.isEmpty(operator)) {
+      // 当前登录管理员
       operator = userInfoHolder.getUser().getUserId();
       appNamespace.setDataChangeCreatedBy(operator);
     }

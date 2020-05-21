@@ -28,7 +28,11 @@ public class PropertyResolver implements ConfigTextResolver {
   @Override
   public ItemChangeSets resolve(long namespaceId, String configText, List<ItemDTO> baseItems) {
 
+    // 创建 Item Map ，以 lineNum 为 键
     Map<Integer, ItemDTO> oldLineNumMapItem = BeanUtils.mapByKey("lineNum", baseItems);
+
+
+    // 创建 Item Map ，以 key 为 键
     Map<String, ItemDTO> oldKeyMapItem = BeanUtils.mapByKey("key", baseItems);
 
     //remove comment and blank item map.
@@ -36,16 +40,20 @@ public class PropertyResolver implements ConfigTextResolver {
 
     String[] newItems = configText.split(ITEM_SEPARATOR);
 
+    // 校验是否存在重复配置 Key 。若是，抛出 BadRequestException 异常
     if (isHasRepeatKey(newItems)) {
       throw new BadRequestException("config text has repeat key please check.");
     }
 
+    // 创建 ItemChangeSets 对象，并解析配置文件到 ItemChangeSets 中。
     ItemChangeSets changeSets = new ItemChangeSets();
     Map<Integer, String> newLineNumMapItem = new HashMap<>();//use for delete blank and comment item
     int lineCounter = 1;
     for (String newItem : newItems) {
       newItem = newItem.trim();
       newLineNumMapItem.put(lineCounter, newItem);
+
+      // 使用行号，获得已存在的 ItemDTO
       ItemDTO oldItemByLine = oldLineNumMapItem.get(lineCounter);
 
       //comment item
@@ -66,7 +74,9 @@ public class PropertyResolver implements ConfigTextResolver {
       lineCounter++;
     }
 
+    // 删除注释和空行配置项
     deleteCommentAndBlankItem(oldLineNumMapItem, newLineNumMapItem, changeSets);
+    // 删除普通配置项
     deleteNormalKVItem(oldKeyMapItem, changeSets);
 
     return changeSets;
@@ -74,6 +84,9 @@ public class PropertyResolver implements ConfigTextResolver {
 
   private boolean isHasRepeatKey(String[] newItems) {
     Set<String> keys = new HashSet<>();
+
+
+    // 记录行数，用于报错提示，无业务逻辑需要。
     int lineCounter = 1;
     int keyCount = 0;
     for (String item : newItems) {
@@ -93,6 +106,8 @@ public class PropertyResolver implements ConfigTextResolver {
   }
 
   private String[] parseKeyValueFromItem(String item) {
+
+//    解析一行，生成 [key, value]
     int kvSeparator = item.indexOf(KV_SEPARATOR);
     if (kvSeparator == -1) {
       return null;
@@ -121,6 +136,7 @@ public class PropertyResolver implements ConfigTextResolver {
   private void handleNormalLine(Long namespaceId, Map<String, ItemDTO> keyMapOldItem, String newItem,
                                 int lineCounter, ItemChangeSets changeSets) {
 
+    // 解析一行，生成 [key, value]
     String[] kv = parseKeyValueFromItem(newItem);
 
     if (kv == null) {
@@ -130,15 +146,22 @@ public class PropertyResolver implements ConfigTextResolver {
     String newKey = kv[0];
     String newValue = kv[1].replace("\\n", "\n"); //handle user input \n
 
+
+    // 获得老的 ItemDTO 对象
     ItemDTO oldItem = keyMapOldItem.get(newKey);
 
+
+    // 不存在，则创建 ItemDTO 到 ItemChangeSets 的添加项
     if (oldItem == null) {//new item
       changeSets.addCreateItem(buildNormalItem(0l, namespaceId, newKey, newValue, "", lineCounter));
+
+      // 如果值或者行号不相等，则创建 ItemDTO 到 ItemChangeSets 的修改项
     } else if (!newValue.equals(oldItem.getValue()) || lineCounter != oldItem.getLineNum()) {//update item
       changeSets.addUpdateItem(
           buildNormalItem(oldItem.getId(), namespaceId, newKey, newValue, oldItem.getComment(),
               lineCounter));
     }
+    // 移除老的 ItemDTO 对象
     keyMapOldItem.remove(newKey);
   }
 

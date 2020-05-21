@@ -16,6 +16,7 @@ import com.ctrip.framework.apollo.common.exception.BadRequestException;
 import com.ctrip.framework.apollo.core.utils.StringUtils;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.gson.Gson;
 import org.aspectj.lang.annotation.After;
 import org.aspectj.lang.annotation.Aspect;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -37,126 +39,187 @@ import java.util.Map;
 @Component
 public class NamespaceUnlockAspect {
 
-  private Gson gson = new Gson();
+    private Gson gson = new Gson();
 
-  private final NamespaceLockService namespaceLockService;
-  private final NamespaceService namespaceService;
-  private final ItemService itemService;
-  private final ReleaseService releaseService;
-  private final BizConfig bizConfig;
+    private final NamespaceLockService namespaceLockService;
+    private final NamespaceService namespaceService;
+    private final ItemService itemService;
+    private final ReleaseService releaseService;
+    private final BizConfig bizConfig;
 
-  public NamespaceUnlockAspect(
-      final NamespaceLockService namespaceLockService,
-      final NamespaceService namespaceService,
-      final ItemService itemService,
-      final ReleaseService releaseService,
-      final BizConfig bizConfig) {
-    this.namespaceLockService = namespaceLockService;
-    this.namespaceService = namespaceService;
-    this.itemService = itemService;
-    this.releaseService = releaseService;
-    this.bizConfig = bizConfig;
-  }
-
-
-  //create item
-  @After("@annotation(PreAcquireNamespaceLock) && args(appId, clusterName, namespaceName, item, ..)")
-  public void requireLockAdvice(String appId, String clusterName, String namespaceName,
-                                ItemDTO item) {
-    tryUnlock(namespaceService.findOne(appId, clusterName, namespaceName));
-  }
-
-  //update item
-  @After("@annotation(PreAcquireNamespaceLock) && args(appId, clusterName, namespaceName, itemId, item, ..)")
-  public void requireLockAdvice(String appId, String clusterName, String namespaceName, long itemId,
-                                ItemDTO item) {
-    tryUnlock(namespaceService.findOne(appId, clusterName, namespaceName));
-  }
-
-  //update by change set
-  @After("@annotation(PreAcquireNamespaceLock) && args(appId, clusterName, namespaceName, changeSet, ..)")
-  public void requireLockAdvice(String appId, String clusterName, String namespaceName,
-                                ItemChangeSets changeSet) {
-    tryUnlock(namespaceService.findOne(appId, clusterName, namespaceName));
-  }
-
-  //delete item
-  @After("@annotation(PreAcquireNamespaceLock) && args(itemId, operator, ..)")
-  public void requireLockAdvice(long itemId, String operator) {
-    Item item = itemService.findOne(itemId);
-    if (item == null) {
-      throw new BadRequestException("item not exist.");
-    }
-    tryUnlock(namespaceService.findOne(item.getNamespaceId()));
-  }
-
-  private void tryUnlock(Namespace namespace) {
-    if (bizConfig.isNamespaceLockSwitchOff()) {
-      return;
+    public NamespaceUnlockAspect(
+            final NamespaceLockService namespaceLockService,
+            final NamespaceService namespaceService,
+            final ItemService itemService,
+            final ReleaseService releaseService,
+            final BizConfig bizConfig) {
+        this.namespaceLockService = namespaceLockService;
+        this.namespaceService = namespaceService;
+        this.itemService = itemService;
+        this.releaseService = releaseService;
+        this.bizConfig = bizConfig;
     }
 
-    if (!isModified(namespace)) {
-      namespaceLockService.unlock(namespace.getId());
+
+    //create item
+    @After("@annotation(PreAcquireNamespaceLock) && args(appId, clusterName, namespaceName, item, ..)")
+    public void requireLockAdvice(String appId, String clusterName, String namespaceName,
+                                  ItemDTO item) {
+
+        // 尝试解锁
+        tryUnlock(namespaceService.findOne(appId, clusterName, namespaceName));
     }
 
-  }
-
-  boolean isModified(Namespace namespace) {
-    Release release = releaseService.findLatestActiveRelease(namespace);
-    List<Item> items = itemService.findItemsWithoutOrdered(namespace.getId());
-
-    if (release == null) {
-      return hasNormalItems(items);
+    //update item
+    @After("@annotation(PreAcquireNamespaceLock) && args(appId, clusterName, namespaceName, itemId, item, ..)")
+    public void requireLockAdvice(String appId, String clusterName, String namespaceName, long itemId,
+                                  ItemDTO item) {
+        // 尝试解锁
+        tryUnlock(namespaceService.findOne(appId, clusterName, namespaceName));
     }
 
-    Map<String, String> releasedConfiguration = gson.fromJson(release.getConfigurations(), GsonType.CONFIG);
-    Map<String, String> configurationFromItems = generateConfigurationFromItems(namespace, items);
-
-    MapDifference<String, String> difference = Maps.difference(releasedConfiguration, configurationFromItems);
-
-    return !difference.areEqual();
-
-  }
-
-  private boolean hasNormalItems(List<Item> items) {
-    for (Item item : items) {
-      if (!StringUtils.isEmpty(item.getKey())) {
-        return true;
-      }
+    //update by change set
+    @After("@annotation(PreAcquireNamespaceLock) && args(appId, clusterName, namespaceName, changeSet, ..)")
+    public void requireLockAdvice(String appId, String clusterName, String namespaceName,
+                                  ItemChangeSets changeSet) {
+        // 尝试解锁
+        tryUnlock(namespaceService.findOne(appId, clusterName, namespaceName));
     }
 
-    return false;
-  }
+    //delete item
+    @After("@annotation(PreAcquireNamespaceLock) && args(itemId, operator, ..)")
+    public void requireLockAdvice(long itemId, String operator) {
 
-  private Map<String, String> generateConfigurationFromItems(Namespace namespace, List<Item> namespaceItems) {
-
-    Map<String, String> configurationFromItems = Maps.newHashMap();
-
-    Namespace parentNamespace = namespaceService.findParentNamespace(namespace);
-    //parent namespace
-    if (parentNamespace == null) {
-      generateMapFromItems(namespaceItems, configurationFromItems);
-    } else {//child namespace
-      Release parentRelease = releaseService.findLatestActiveRelease(parentNamespace);
-      if (parentRelease != null) {
-        configurationFromItems = gson.fromJson(parentRelease.getConfigurations(), GsonType.CONFIG);
-      }
-      generateMapFromItems(namespaceItems, configurationFromItems);
+        // 获得 Item 对象。若不存在，抛出 BadRequestException 异常
+        Item item = itemService.findOne(itemId);
+        if (item == null) {
+            throw new BadRequestException("item not exist.");
+        }
+        // 尝试解锁
+        tryUnlock(namespaceService.findOne(item.getNamespaceId()));
     }
 
-    return configurationFromItems;
-  }
+    private void tryUnlock(Namespace namespace) {
 
-  private Map<String, String> generateMapFromItems(List<Item> items, Map<String, String> configurationFromItems) {
-    for (Item item : items) {
-      String key = item.getKey();
-      if (StringUtils.isBlank(key)) {
-        continue;
-      }
-      configurationFromItems.put(key, item.getValue());
+
+        // 当关闭锁定 Namespace 开关时，直接返回
+        if (bizConfig.isNamespaceLockSwitchOff()) {
+            return;
+        }
+
+        // 若当前 Namespace 的配置恢复原有状态，释放锁，即删除 NamespaceLock
+        if (!isModified(namespace)) {
+            namespaceLockService.unlock(namespace.getId());
+        }
+
     }
 
-    return configurationFromItems;
-  }
+    /**
+     *
+     * 若当前 Namespace 的配置恢复原有状态。
+     *
+     *
+     * @param namespace
+     * @return
+     */
+    boolean isModified(Namespace namespace) {
 
+        // 获得当前 Namespace 的最后有效的 Release 对象
+        Release release = releaseService.findLatestActiveRelease(namespace);
+
+        // 获得当前 Namespace 的 Item 集合
+        List<Item> items = itemService.findItemsWithoutOrdered(namespace.getId());
+
+
+        // 如果无 Release 对象，判断是否有普通的 Item 配置项。若有，则代表修改过。
+        if (release == null) {
+            return hasNormalItems(items);
+        }
+
+        // 获得 Release 的配置 Map
+        Map<String, String> releasedConfiguration = gson.fromJson(release.getConfigurations(), GsonType.CONFIG);
+
+        // 获得当前 Namespace 的配置 Map
+        Map<String, String> configurationFromItems = generateConfigurationFromItems(namespace, items);
+
+        // 取差集
+        // 对比两个 配置 Map ，判断是否相等。
+        MapDifference<String, String> difference = Maps.difference(releasedConfiguration, configurationFromItems);
+
+        // 2个 是否相等
+        return !difference.areEqual();
+
+    }
+
+    private boolean hasNormalItems(List<Item> items) {
+        for (Item item : items) {
+            if (!StringUtils.isEmpty(item.getKey())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private Map<String, String> generateConfigurationFromItems(Namespace namespace, List<Item> namespaceItems) {
+
+        Map<String, String> configurationFromItems = Maps.newHashMap();
+
+        // 获得父 Namespace 对象
+        Namespace parentNamespace = namespaceService.findParentNamespace(namespace);
+
+        // 若无父 Namespace ，使用自己的配置
+        //parent namespace
+        if (parentNamespace == null) {
+            generateMapFromItems(namespaceItems, configurationFromItems);
+            // 若有父 Namespace ，说明是灰度发布，合并父 Namespace 的配置 + 自己的配置项
+        } else {//child namespace
+            Release parentRelease = releaseService.findLatestActiveRelease(parentNamespace);
+            if (parentRelease != null) {
+                configurationFromItems = gson.fromJson(parentRelease.getConfigurations(), GsonType.CONFIG);
+            }
+            generateMapFromItems(namespaceItems, configurationFromItems);
+        }
+
+        return configurationFromItems;
+    }
+
+    private Map<String, String> generateMapFromItems(List<Item> items, Map<String, String> configurationFromItems) {
+        for (Item item : items) {
+            String key = item.getKey();
+
+            // 跳过注释和空行的配置项
+            if (StringUtils.isBlank(key)) {
+                continue;
+            }
+            configurationFromItems.put(key, item.getValue());
+        }
+
+        return configurationFromItems;
+    }
+
+
+    public static void main(String[] args) {
+        Set<Integer> sets = Sets.newHashSet(1, 2, 3, 4, 5, 6);
+        Set<Integer> sets2 = Sets.newHashSet(3, 4, 5, 6, 7, 8, 9);
+        // 交集
+        System.out.println("交集为：");
+        Sets.SetView<Integer> intersection = Sets.intersection(sets, sets2);
+        for (Integer temp : intersection) {
+            System.out.println(temp);
+        }
+        // 差集
+        System.out.println("差集为：");
+//        Sets.SetView<Integer> diff = Sets.difference(sets, sets2);
+        Sets.SetView<Integer> diff = Sets.difference(sets2, sets);
+        for (Integer temp : diff) {
+            System.out.println(temp);
+        }
+        // 并集
+        System.out.println("并集为：");
+        Sets.SetView<Integer> union = Sets.union(sets, sets2);
+        for (Integer temp : union) {
+            System.out.println(temp);
+        }
+    }
 }

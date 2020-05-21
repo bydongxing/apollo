@@ -55,6 +55,13 @@ public class CreationListener {
         }
     }
 
+    /**
+     *
+     *
+     * 监听 AppNameSpaces
+     *
+     * @param event
+     */
     @EventListener
     public void onAppNamespaceCreationEvent(AppNamespaceCreationEvent event) {
         AppNamespaceDTO appNamespace = BeanUtils.transform(AppNamespaceDTO.class, event.getAppNamespace());

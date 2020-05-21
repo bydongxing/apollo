@@ -3,15 +3,14 @@ package com.ctrip.framework.apollo.common.entity;
 
 import com.ctrip.framework.apollo.common.utils.InputValidator;
 import com.ctrip.framework.apollo.core.enums.ConfigFileFormat;
-
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Pattern;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Table;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
 
 @Entity
 @Table(name = "AppNamespace")
@@ -31,9 +30,20 @@ public class AppNamespace extends BaseEntity {
   @Column(name = "AppId", nullable = false)
   private String appId;
 
+  /**
+   *
+   * {@link com.ctrip.framework.apollo.core.enums.ConfigFileFormat}
+   *
+   */
   @Column(name = "Format", nullable = false)
   private String format;
 
+  /**
+   *
+   * private （私有的）：private 权限的 Namespace ，只能被所属的应用获取到。一个应用尝试获取其它应用 private 的 Namespace ，Apollo 会报 “404” 异常。
+   * public （公共的）：public 权限的 Namespace ，能被任何应用获取。
+   *
+   */
   @Column(name = "IsPublic", columnDefinition = "Bit default '0'")
   private boolean isPublic = false;
 

@@ -34,6 +34,17 @@ public class AppNamespaceController {
     this.namespaceService = namespaceService;
   }
 
+
+  /**
+   *
+   * AppNamespace 是 App 下的每个 Cluster 默认创建的 Namespace
+   * Namespace 是 每个 Cluster 实际拥有的 Namespace
+   *
+   *
+   * @param appNamespace
+   * @param silentCreation
+   * @return
+   */
   @PostMapping("/apps/{appId}/appnamespaces")
   public AppNamespaceDTO create(@RequestBody AppNamespaceDTO appNamespace,
                                 @RequestParam(defaultValue = "false") boolean silentCreation) {
